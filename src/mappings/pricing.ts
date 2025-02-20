@@ -4,10 +4,10 @@ import { Address, BigDecimal, BigInt } from '@graphprotocol/graph-ts/index'
 import { Bundle, Pair, Token } from '../types/schema'
 import { ADDRESS_ZERO, factoryContract, ONE_BD, UNTRACKED_PAIRS, ZERO_BD } from './helpers'
 
-const WETH_ADDRESS = '0x3e40f60fcbef03198e845a8bb2ca7734dda6369c'
-const USDC_WETH_PAIR = '0x71cd05964ee9c97553ac6b6d60cfd4fee046453c' // created 10008355
-const DAI_WETH_PAIR = '' // created block 10042267
-const USDT_WETH_PAIR = '' // created block 10093341
+const WETH_ADDRESS = process.env.WETH_ADDRESS || ''
+const USDC_WETH_PAIR = process.env.USDC_WETH_PAIR || ''
+const DAI_WETH_PAIR = ''
+const USDT_WETH_PAIR = process.env.USDT_WETH_PAIR || ''
 
 export function getEthPriceInUSD(): BigDecimal {
   // fetch eth prices for each stablecoin
@@ -40,10 +40,7 @@ export function getEthPriceInUSD(): BigDecimal {
 }
 
 // token where amounts should contribute to tracked volume and liquidity
-let WHITELIST: string[] = [
-  '0x3e40f60fcbef03198e845a8bb2ca7734dda6369c', // WETH
-  '0xcfd326a5b6f9ff2071b854e623307ed858b246d3', // USDC
-]
+let WHITELIST: string[] = process.env.WHITELIST ? process.env.WHITELIST.split(',') : []
 
 // minimum liquidity required to count towards tracked volume for pairs with small # of Lps
 let MINIMUM_USD_THRESHOLD_NEW_PAIRS = BigDecimal.fromString('400000')

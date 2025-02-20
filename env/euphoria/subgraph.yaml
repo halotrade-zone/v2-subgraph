@@ -6,11 +6,11 @@ schema:
 dataSources:
   - kind: ethereum/contract
     name: Factory
-    network: serenity-2
+    network: euphoria
     source:
-      address: '0x0a36C3a83159A998676b55b9393226542aF68F0b'
+      address: '0x80bfECE542B8165C6ef0e5D0d859bd08f2c09059'
       abi: Factory
-      startBlock: 21156100
+      startBlock: 14708283
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
@@ -34,7 +34,7 @@ dataSources:
 templates:
   - kind: ethereum/contract
     name: Pair
-    network: serenity-2
+    network: euphoria
     source:
       abi: Pair
     mapping:

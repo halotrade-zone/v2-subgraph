@@ -10,12 +10,6 @@ export class TokenDefinition {
   // Get all tokens with a static defintion
   static getStaticDefinitions(): Array<TokenDefinition> {
     const staticDefinitions: Array<TokenDefinition> = [
-      {
-        address: Address.fromString('0xcfd326a5b6f9ff2071b854e623307ed858b246d3'),
-        symbol: 'USDC',
-        name: 'USDC',
-        decimals: BigInt.fromI32(18),
-      },
     ]
     return staticDefinitions
   }
