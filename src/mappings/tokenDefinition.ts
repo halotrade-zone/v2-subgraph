@@ -9,8 +9,7 @@ export class TokenDefinition {
 
   // Get all tokens with a static defintion
   static getStaticDefinitions(): Array<TokenDefinition> {
-    const staticDefinitions: Array<TokenDefinition> = [
-    ]
+    const staticDefinitions: Array<TokenDefinition> = []
     return staticDefinitions
   }
 

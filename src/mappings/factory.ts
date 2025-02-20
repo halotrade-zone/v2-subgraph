@@ -4,8 +4,8 @@ import { log } from '@graphprotocol/graph-ts'
 import { PairCreated } from '../types/Factory/Factory'
 import { Bundle, Pair, Token, UniswapFactory } from '../types/schema'
 import { Pair as PairTemplate } from '../types/templates'
+import { FACTORY_ADDRESS } from '../utils/constants'
 import {
-  FACTORY_ADDRESS,
   fetchTokenDecimals,
   fetchTokenName,
   fetchTokenSymbol,

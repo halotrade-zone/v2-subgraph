@@ -2,12 +2,8 @@
 import { Address, BigDecimal, BigInt } from '@graphprotocol/graph-ts/index'
 
 import { Bundle, Pair, Token } from '../types/schema'
+import { DAI_WETH_PAIR, USDC_WETH_PAIR, USDT_WETH_PAIR, WETH_ADDRESS, WHITELIST } from '../utils/constants'
 import { ADDRESS_ZERO, factoryContract, ONE_BD, UNTRACKED_PAIRS, ZERO_BD } from './helpers'
-
-const WETH_ADDRESS = process.env.WETH_ADDRESS || ''
-const USDC_WETH_PAIR = process.env.USDC_WETH_PAIR || ''
-const DAI_WETH_PAIR = ''
-const USDT_WETH_PAIR = process.env.USDT_WETH_PAIR || ''
 
 export function getEthPriceInUSD(): BigDecimal {
   // fetch eth prices for each stablecoin
@@ -38,9 +34,6 @@ export function getEthPriceInUSD(): BigDecimal {
     return ZERO_BD
   }
 }
-
-// token where amounts should contribute to tracked volume and liquidity
-let WHITELIST: string[] = process.env.WHITELIST ? process.env.WHITELIST.split(',') : []
 
 // minimum liquidity required to count towards tracked volume for pairs with small # of Lps
 let MINIMUM_USD_THRESHOLD_NEW_PAIRS = BigDecimal.fromString('400000')

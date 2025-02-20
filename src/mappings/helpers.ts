@@ -6,10 +6,10 @@ import { ERC20NameBytes } from '../types/Factory/ERC20NameBytes'
 import { ERC20SymbolBytes } from '../types/Factory/ERC20SymbolBytes'
 import { User } from '../types/schema'
 import { Factory as FactoryContract } from '../types/templates/Pair/Factory'
+import { FACTORY_ADDRESS } from '../utils/constants'
 import { TokenDefinition } from './tokenDefinition'
 
 export const ADDRESS_ZERO = '0x0000000000000000000000000000000000000000'
-export const FACTORY_ADDRESS = process.env.FACTORY_ADDRESS || ''
 
 export let ZERO_BI = BigInt.fromI32(0)
 export let ONE_BI = BigInt.fromI32(1)
