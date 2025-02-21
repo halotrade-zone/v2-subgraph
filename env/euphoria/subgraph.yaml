@@ -8,9 +8,9 @@ dataSources:
     name: Factory
     network: euphoria
     source:
-      address: '0x80bfECE542B8165C6ef0e5D0d859bd08f2c09059'
+      address: '0x6685B976504631b6C189d521586C02c7055371e6'
       abi: Factory
-      startBlock: 14708283
+      startBlock: 14753377
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.7
