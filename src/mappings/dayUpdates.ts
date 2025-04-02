@@ -3,7 +3,7 @@ import { BigDecimal, BigInt, ethereum } from '@graphprotocol/graph-ts'
 
 import { Bundle, Pair, PairDayData, Token, TokenDayData, UniswapDayData, UniswapFactory } from '../types/schema'
 import { FACTORY_ADDRESS } from '../utils/constants'
-import { PairHourData, PairMinuteData } from './../types/schema'
+import { PairHourData, PairMinuteData, TokenHourData, TokenMinuteData } from './../types/schema'
 import { ONE_BI, ZERO_BD, ZERO_BI } from './helpers'
 
 export function updateUniswapDayData(event: ethereum.Event): UniswapDayData {
@@ -147,4 +147,64 @@ export function updateTokenDayData(token: Token, event: ethereum.Event): TokenDa
   // updateStoredPairs(tokenDayData as TokenDayData, dayPairID)
 
   return tokenDayData as TokenDayData
+}
+
+export function updateTokenHourData(token: Token, event: ethereum.Event): TokenHourData {
+  let bundle = Bundle.load('1')!
+  let timestamp = event.block.timestamp.toI32()
+  let hourIndex = timestamp / 3600
+  let hourStartUnix = hourIndex * 3600
+  let tokenHourID = token.id.toString().concat('-').concat(BigInt.fromI32(hourIndex).toString())
+
+  let tokenHourData = TokenHourData.load(tokenHourID)
+  if (tokenHourData === null) {
+    tokenHourData = new TokenHourData(tokenHourID)
+    tokenHourData.hourStartUnix = hourStartUnix
+    tokenHourData.token = token.id
+    tokenHourData.priceUSD = token.derivedETH.times(bundle.ethPrice)
+    tokenHourData.hourlyVolumeToken = ZERO_BD
+    tokenHourData.hourlyVolumeETH = ZERO_BD
+    tokenHourData.hourlyVolumeUSD = ZERO_BD
+    tokenHourData.hourlyTxns = ZERO_BI
+    tokenHourData.totalLiquidityUSD = ZERO_BD
+  }
+
+  tokenHourData.priceUSD = token.derivedETH.times(bundle.ethPrice)
+  tokenHourData.totalLiquidityToken = token.totalLiquidity
+  tokenHourData.totalLiquidityETH = token.totalLiquidity.times(token.derivedETH as BigDecimal)
+  tokenHourData.totalLiquidityUSD = tokenHourData.totalLiquidityETH.times(bundle.ethPrice)
+  tokenHourData.hourlyTxns = tokenHourData.hourlyTxns.plus(ONE_BI)
+  tokenHourData.save()
+
+  return tokenHourData as TokenHourData
+}
+
+export function updateTokenMinuteData(token: Token, event: ethereum.Event): TokenMinuteData {
+  let bundle = Bundle.load('1')!
+  let timestamp = event.block.timestamp.toI32()
+  let minuteIndex = timestamp / 60
+  let minuteStartUnix = minuteIndex * 60
+  let tokenMinuteID = token.id.toString().concat('-').concat(BigInt.fromI32(minuteIndex).toString())
+
+  let tokenMinuteData = TokenMinuteData.load(tokenMinuteID)
+  if (tokenMinuteData === null) {
+    tokenMinuteData = new TokenMinuteData(tokenMinuteID)
+    tokenMinuteData.minuteStartUnix = minuteStartUnix
+    tokenMinuteData.token = token.id
+    tokenMinuteData.priceUSD = token.derivedETH.times(bundle.ethPrice)
+    tokenMinuteData.minuteVolumeToken = ZERO_BD
+    tokenMinuteData.minuteVolumeETH = ZERO_BD
+    tokenMinuteData.minuteVolumeUSD = ZERO_BD
+    tokenMinuteData.minuteTxns = ZERO_BI
+    tokenMinuteData.totalLiquidityUSD = ZERO_BD
+  }
+
+  tokenMinuteData.priceUSD = token.derivedETH.times(bundle.ethPrice)
+  tokenMinuteData.totalLiquidityToken = token.totalLiquidity
+  tokenMinuteData.totalLiquidityETH = token.totalLiquidity.times(token.derivedETH as BigDecimal)
+  tokenMinuteData.totalLiquidityUSD = tokenMinuteData.totalLiquidityETH.times(bundle.ethPrice)
+  tokenMinuteData.minuteTxns = tokenMinuteData.minuteTxns.plus(ONE_BI)
+  tokenMinuteData.save()
+
+  return tokenMinuteData as TokenMinuteData
 }

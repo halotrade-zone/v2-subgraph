@@ -295,3 +295,43 @@ type TokenDayData @entity {
   # price stats
   priceUSD: BigDecimal!
 }
+
+type TokenHourData @entity {
+  id: ID!
+  hourStartUnix: Int!
+  token: Token!
+
+  # volume stats
+  hourlyVolumeToken: BigDecimal!
+  hourlyVolumeETH: BigDecimal!
+  hourlyVolumeUSD: BigDecimal!
+  hourlyTxns: BigInt!
+
+  # liquidity stats
+  totalLiquidityToken: BigDecimal!
+  totalLiquidityETH: BigDecimal!
+  totalLiquidityUSD: BigDecimal!
+
+  # price stats
+  priceUSD: BigDecimal!
+}
+
+type TokenMinuteData @entity {
+  id: ID!
+  minuteStartUnix: Int!
+  token: Token!
+
+  # volume stats
+  minuteVolumeToken: BigDecimal!
+  minuteVolumeETH: BigDecimal!
+  minuteVolumeUSD: BigDecimal!
+  minuteTxns: BigInt!
+
+  # liquidity stats
+  totalLiquidityToken: BigDecimal!
+  totalLiquidityETH: BigDecimal!
+  totalLiquidityUSD: BigDecimal!
+
+  # price stats
+  priceUSD: BigDecimal!
+}
