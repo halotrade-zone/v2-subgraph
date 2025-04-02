@@ -13,7 +13,7 @@ import {
 } from '../types/schema'
 import { Burn, Mint, Swap, Sync, Transfer } from '../types/templates/Pair/Pair'
 import { FACTORY_ADDRESS } from '../utils/constants'
-import { updatePairDayData, updatePairHourData, updateTokenDayData, updateUniswapDayData } from './dayUpdates'
+import { updatePairDayData, updatePairHourData, updateTokenDayData, updateUniswapDayData, updatePairMinuteData } from './dayUpdates'
 import { ADDRESS_ZERO, BI_18, convertTokenToDecimal, createUser, ONE_BI, ZERO_BD } from './helpers'
 import { findEthPerToken, getEthPriceInUSD, getTrackedLiquidityUSD, getTrackedVolumeUSD } from './pricing'
 
@@ -500,11 +500,18 @@ export function handleSwap(event: Swap): void {
   transaction.save()
 
   // update day entities
+  let pairMinuteData = updatePairMinuteData(event)
   let pairDayData = updatePairDayData(event)
   let pairHourData = updatePairHourData(event)
   let uniswapDayData = updateUniswapDayData(event)
   let token0DayData = updateTokenDayData(token0 as Token, event)
   let token1DayData = updateTokenDayData(token1 as Token, event)
+
+  // Add minute-specific volume updates
+  pairMinuteData.minuteVolumeToken0 = pairMinuteData.minuteVolumeToken0.plus(amount0Total)
+  pairMinuteData.minuteVolumeToken1 = pairMinuteData.minuteVolumeToken1.plus(amount1Total)
+  pairMinuteData.minuteVolumeUSD = pairMinuteData.minuteVolumeUSD.plus(trackedAmountUSD)
+  pairMinuteData.save()
 
   // swap specific updating
   uniswapDayData.dailyVolumeUSD = uniswapDayData.dailyVolumeUSD.plus(trackedAmountUSD)

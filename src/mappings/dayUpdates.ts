@@ -3,7 +3,7 @@ import { BigDecimal, BigInt, ethereum } from '@graphprotocol/graph-ts'
 
 import { Bundle, Pair, PairDayData, Token, TokenDayData, UniswapDayData, UniswapFactory } from '../types/schema'
 import { FACTORY_ADDRESS } from '../utils/constants'
-import { PairHourData } from './../types/schema'
+import { PairHourData, PairMinuteData } from './../types/schema'
 import { ONE_BI, ZERO_BD, ZERO_BI } from './helpers'
 
 export function updateUniswapDayData(event: ethereum.Event): UniswapDayData {
@@ -84,6 +84,34 @@ export function updatePairHourData(event: ethereum.Event): PairHourData {
   pairHourData.save()
 
   return pairHourData as PairHourData
+}
+
+export function updatePairMinuteData(event: ethereum.Event): PairMinuteData {
+  let timestamp = event.block.timestamp.toI32()
+  let minuteIndex = timestamp / 60 // get unique minute within unix history
+  let minuteStartUnix = minuteIndex * 60
+  let minutePairID = event.address.toHexString().concat('-').concat(BigInt.fromI32(minuteIndex).toString())
+  let pair = Pair.load(event.address.toHexString())!
+  let pairMinuteData = PairMinuteData.load(minutePairID)
+  
+  if (pairMinuteData === null) {
+    pairMinuteData = new PairMinuteData(minutePairID)
+    pairMinuteData.minuteStartUnix = minuteStartUnix
+    pairMinuteData.pair = event.address.toHexString()
+    pairMinuteData.minuteVolumeToken0 = ZERO_BD
+    pairMinuteData.minuteVolumeToken1 = ZERO_BD
+    pairMinuteData.minuteVolumeUSD = ZERO_BD
+    pairMinuteData.minuteTxns = ZERO_BI
+  }
+
+  pairMinuteData.totalSupply = pair.totalSupply
+  pairMinuteData.reserve0 = pair.reserve0
+  pairMinuteData.reserve1 = pair.reserve1
+  pairMinuteData.reserveUSD = pair.reserveUSD
+  pairMinuteData.minuteTxns = pairMinuteData.minuteTxns.plus(ONE_BI)
+  pairMinuteData.save() // <-- Here's the save call
+
+  return pairMinuteData as PairMinuteData
 }
 
 export function updateTokenDayData(token: Token, event: ethereum.Event): TokenDayData {
