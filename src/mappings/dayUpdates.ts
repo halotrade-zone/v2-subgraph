@@ -34,7 +34,10 @@ export function updatePairDayData(event: ethereum.Event): PairDayData {
   let timestamp = event.block.timestamp.toI32()
   let dayID = timestamp / 86400
   let dayStartTimestamp = dayID * 86400
-  let dayPairID = event.address.toHexString().concat('-').concat(BigInt.fromI32(dayID).toString())
+  let dayPairID = event.address
+    .toHexString()
+    .concat('-')
+    .concat(BigInt.fromI32(dayID).toString())
   let pair = Pair.load(event.address.toHexString())!
   let pairDayData = PairDayData.load(dayPairID)
   if (pairDayData === null) {
@@ -63,7 +66,10 @@ export function updatePairHourData(event: ethereum.Event): PairHourData {
   let timestamp = event.block.timestamp.toI32()
   let hourIndex = timestamp / 3600 // get unique hour within unix history
   let hourStartUnix = hourIndex * 3600 // want the rounded effect
-  let hourPairID = event.address.toHexString().concat('-').concat(BigInt.fromI32(hourIndex).toString())
+  let hourPairID = event.address
+    .toHexString()
+    .concat('-')
+    .concat(BigInt.fromI32(hourIndex).toString())
   let pair = Pair.load(event.address.toHexString())!
   let pairHourData = PairHourData.load(hourPairID)
   if (pairHourData === null) {
@@ -90,10 +96,13 @@ export function updatePairMinuteData(event: ethereum.Event): PairMinuteData {
   let timestamp = event.block.timestamp.toI32()
   let minuteIndex = timestamp / 60 // get unique minute within unix history
   let minuteStartUnix = minuteIndex * 60
-  let minutePairID = event.address.toHexString().concat('-').concat(BigInt.fromI32(minuteIndex).toString())
+  let minutePairID = event.address
+    .toHexString()
+    .concat('-')
+    .concat(BigInt.fromI32(minuteIndex).toString())
   let pair = Pair.load(event.address.toHexString())!
   let pairMinuteData = PairMinuteData.load(minutePairID)
-  
+
   if (pairMinuteData === null) {
     pairMinuteData = new PairMinuteData(minutePairID)
     pairMinuteData.minuteStartUnix = minuteStartUnix
@@ -119,7 +128,10 @@ export function updateTokenDayData(token: Token, event: ethereum.Event): TokenDa
   let timestamp = event.block.timestamp.toI32()
   let dayID = timestamp / 86400
   let dayStartTimestamp = dayID * 86400
-  let tokenDayID = token.id.toString().concat('-').concat(BigInt.fromI32(dayID).toString())
+  let tokenDayID = token.id
+    .toString()
+    .concat('-')
+    .concat(BigInt.fromI32(dayID).toString())
 
   let tokenDayData = TokenDayData.load(tokenDayID)
   if (tokenDayData === null) {
@@ -150,15 +162,70 @@ export function updateTokenDayData(token: Token, event: ethereum.Event): TokenDa
 }
 
 export function updateTokenHourData(token: Token, event: ethereum.Event): TokenHourData {
-  let bundle = Bundle.load('1')!
   let timestamp = event.block.timestamp.toI32()
   let hourIndex = timestamp / 3600
   let hourStartUnix = hourIndex * 3600
-  let tokenHourID = token.id.toString().concat('-').concat(BigInt.fromI32(hourIndex).toString())
+  let bundle = Bundle.load('1')!
 
-  let tokenHourData = TokenHourData.load(tokenHourID)
+  // Fill missing hour data
+  let prevHourIndex = hourIndex - 1
+  let lastHourData: TokenHourData | null = null
+
+  // Find last saved hour data
+  for (let i = prevHourIndex; i > prevHourIndex - 24; i--) {
+    let prevID = token.id
+      .toString()
+      .concat('-')
+      .concat(BigInt.fromI32(i).toString())
+    let prevData = TokenHourData.load(prevID)
+    if (prevData !== null) {
+      lastHourData = prevData
+      break
+    }
+  }
+
+  // Fill gaps with last known values
+  for (let i = prevHourIndex; i < hourIndex; i++) {
+    let thisID = token.id
+      .toString()
+      .concat('-')
+      .concat(BigInt.fromI32(i).toString())
+    let thisData = TokenHourData.load(thisID)
+
+    if (thisData === null) {
+      thisData = new TokenHourData(thisID)
+      thisData.hourStartUnix = i * 3600
+      thisData.token = token.id
+
+      if (lastHourData !== null) {
+        thisData.priceUSD = lastHourData.priceUSD
+        thisData.totalLiquidityToken = lastHourData.totalLiquidityToken
+        thisData.totalLiquidityETH = lastHourData.totalLiquidityETH
+        thisData.totalLiquidityUSD = lastHourData.totalLiquidityUSD
+      } else {
+        let bundle = Bundle.load('1')!
+        thisData.priceUSD = token.derivedETH.times(bundle.ethPrice)
+        thisData.totalLiquidityToken = token.totalLiquidity
+        thisData.totalLiquidityETH = token.totalLiquidity.times(token.derivedETH as BigDecimal)
+        thisData.totalLiquidityUSD = thisData.totalLiquidityETH.times(bundle.ethPrice)
+      }
+
+      thisData.hourlyVolumeToken = ZERO_BD
+      thisData.hourlyVolumeETH = ZERO_BD
+      thisData.hourlyVolumeUSD = ZERO_BD
+      thisData.hourlyTxns = ZERO_BI
+      thisData.save()
+    }
+  }
+
+  // Get or create current hour data
+  let hourID = token.id
+    .toString()
+    .concat('-')
+    .concat(BigInt.fromI32(hourIndex).toString())
+  let tokenHourData = TokenHourData.load(hourID)
   if (tokenHourData === null) {
-    tokenHourData = new TokenHourData(tokenHourID)
+    tokenHourData = new TokenHourData(hourID)
     tokenHourData.hourStartUnix = hourStartUnix
     tokenHourData.token = token.id
     tokenHourData.priceUSD = token.derivedETH.times(bundle.ethPrice)
@@ -180,15 +247,70 @@ export function updateTokenHourData(token: Token, event: ethereum.Event): TokenH
 }
 
 export function updateTokenMinuteData(token: Token, event: ethereum.Event): TokenMinuteData {
-  let bundle = Bundle.load('1')!
   let timestamp = event.block.timestamp.toI32()
   let minuteIndex = timestamp / 60
   let minuteStartUnix = minuteIndex * 60
-  let tokenMinuteID = token.id.toString().concat('-').concat(BigInt.fromI32(minuteIndex).toString())
+  let bundle = Bundle.load('1')!
 
-  let tokenMinuteData = TokenMinuteData.load(tokenMinuteID)
+  // Fill missing minute data
+  let prevMinuteIndex = minuteIndex - 1
+  let lastMinuteData: TokenMinuteData | null = null
+
+  // Find last saved minute data
+  for (let i = prevMinuteIndex; i > prevMinuteIndex - 60; i--) {
+    let prevID = token.id
+      .toString()
+      .concat('-')
+      .concat(BigInt.fromI32(i).toString())
+    let prevData = TokenMinuteData.load(prevID)
+    if (prevData !== null) {
+      lastMinuteData = prevData
+      break
+    }
+  }
+
+  // Fill gaps with last known values
+  for (let i = prevMinuteIndex; i < minuteIndex; i++) {
+    let thisID = token.id
+      .toString()
+      .concat('-')
+      .concat(BigInt.fromI32(i).toString())
+    let thisData = TokenMinuteData.load(thisID)
+
+    if (thisData === null) {
+      thisData = new TokenMinuteData(thisID)
+      thisData.minuteStartUnix = i * 60
+      thisData.token = token.id
+
+      if (lastMinuteData !== null) {
+        thisData.priceUSD = lastMinuteData.priceUSD
+        thisData.totalLiquidityToken = lastMinuteData.totalLiquidityToken
+        thisData.totalLiquidityETH = lastMinuteData.totalLiquidityETH
+        thisData.totalLiquidityUSD = lastMinuteData.totalLiquidityUSD
+      } else {
+        let bundle = Bundle.load('1')!
+        thisData.priceUSD = token.derivedETH.times(bundle.ethPrice)
+        thisData.totalLiquidityToken = token.totalLiquidity
+        thisData.totalLiquidityETH = token.totalLiquidity.times(token.derivedETH as BigDecimal)
+        thisData.totalLiquidityUSD = thisData.totalLiquidityETH.times(bundle.ethPrice)
+      }
+
+      thisData.minuteVolumeToken = ZERO_BD
+      thisData.minuteVolumeETH = ZERO_BD
+      thisData.minuteVolumeUSD = ZERO_BD
+      thisData.minuteTxns = ZERO_BI
+      thisData.save()
+    }
+  }
+
+  // Get or create current minute data
+  let minuteID = token.id
+    .toString()
+    .concat('-')
+    .concat(BigInt.fromI32(minuteIndex).toString())
+  let tokenMinuteData = TokenMinuteData.load(minuteID)
   if (tokenMinuteData === null) {
-    tokenMinuteData = new TokenMinuteData(tokenMinuteID)
+    tokenMinuteData = new TokenMinuteData(minuteID)
     tokenMinuteData.minuteStartUnix = minuteStartUnix
     tokenMinuteData.token = token.id
     tokenMinuteData.priceUSD = token.derivedETH.times(bundle.ethPrice)
@@ -203,8 +325,108 @@ export function updateTokenMinuteData(token: Token, event: ethereum.Event): Toke
   tokenMinuteData.totalLiquidityToken = token.totalLiquidity
   tokenMinuteData.totalLiquidityETH = token.totalLiquidity.times(token.derivedETH as BigDecimal)
   tokenMinuteData.totalLiquidityUSD = tokenMinuteData.totalLiquidityETH.times(bundle.ethPrice)
-  tokenMinuteData.minuteTxns = tokenMinuteData.minuteTxns.plus(ONE_BI)
   tokenMinuteData.save()
 
   return tokenMinuteData as TokenMinuteData
+}
+
+export function fillTokenMinuteData(token: Token, event: ethereum.Event): void {
+  let timestamp = event.block.timestamp.toI32()
+  let minuteIndex = timestamp / 60
+  let lastMinuteData: TokenMinuteData | null = null
+
+  // Find last saved minute data
+  for (let i = minuteIndex - 1; i > minuteIndex - 60 && lastMinuteData === null; i--) {
+    let previousID = token.id
+      .toString()
+      .concat('-')
+      .concat(BigInt.fromI32(i).toString())
+    lastMinuteData = TokenMinuteData.load(previousID)
+  }
+
+  // Fill missing minutes with last known values
+  for (let i = minuteIndex - 1; i < minuteIndex; i++) {
+    let minuteID = token.id
+      .toString()
+      .concat('-')
+      .concat(BigInt.fromI32(i).toString())
+    let minuteData = TokenMinuteData.load(minuteID)
+
+    if (minuteData === null) {
+      minuteData = new TokenMinuteData(minuteID)
+      minuteData.minuteStartUnix = i * 60
+      minuteData.token = token.id
+
+      // Copy values from last known data or initialize with current values
+      if (lastMinuteData !== null) {
+        minuteData.priceUSD = lastMinuteData.priceUSD
+        minuteData.totalLiquidityToken = lastMinuteData.totalLiquidityToken
+        minuteData.totalLiquidityETH = lastMinuteData.totalLiquidityETH
+        minuteData.totalLiquidityUSD = lastMinuteData.totalLiquidityUSD
+      } else {
+        let bundle = Bundle.load('1')!
+        minuteData.priceUSD = token.derivedETH.times(bundle.ethPrice)
+        minuteData.totalLiquidityToken = token.totalLiquidity
+        minuteData.totalLiquidityETH = token.totalLiquidity.times(token.derivedETH as BigDecimal)
+        minuteData.totalLiquidityUSD = minuteData.totalLiquidityETH.times(bundle.ethPrice)
+      }
+
+      minuteData.minuteVolumeToken = ZERO_BD
+      minuteData.minuteVolumeETH = ZERO_BD
+      minuteData.minuteVolumeUSD = ZERO_BD
+      minuteData.minuteTxns = ZERO_BI
+      minuteData.save()
+    }
+  }
+}
+
+export function fillTokenHourData(token: Token, event: ethereum.Event): void {
+  // Similar implementation for hourly data
+  let timestamp = event.block.timestamp.toI32()
+  let hourIndex = timestamp / 3600
+  let lastHourData: TokenHourData | null = null
+
+  // Find last saved hour data
+  for (let i = hourIndex - 1; i > hourIndex - 24 && lastHourData === null; i--) {
+    let previousID = token.id
+      .toString()
+      .concat('-')
+      .concat(BigInt.fromI32(i).toString())
+    lastHourData = TokenHourData.load(previousID)
+  }
+
+  // Fill missing hours
+  for (let i = hourIndex - 1; i < hourIndex; i++) {
+    let hourID = token.id
+      .toString()
+      .concat('-')
+      .concat(BigInt.fromI32(i).toString())
+    let hourData = TokenHourData.load(hourID)
+
+    if (hourData === null) {
+      hourData = new TokenHourData(hourID)
+      hourData.hourStartUnix = i * 3600
+      hourData.token = token.id
+
+      // Copy values from last known data or initialize with current values
+      if (lastHourData !== null) {
+        hourData.priceUSD = lastHourData.priceUSD
+        hourData.totalLiquidityToken = lastHourData.totalLiquidityToken
+        hourData.totalLiquidityETH = lastHourData.totalLiquidityETH
+        hourData.totalLiquidityUSD = lastHourData.totalLiquidityUSD
+      } else {
+        let bundle = Bundle.load('1')!
+        hourData.priceUSD = token.derivedETH.times(bundle.ethPrice)
+        hourData.totalLiquidityToken = token.totalLiquidity
+        hourData.totalLiquidityETH = token.totalLiquidity.times(token.derivedETH as BigDecimal)
+        hourData.totalLiquidityUSD = hourData.totalLiquidityETH.times(bundle.ethPrice)
+      }
+
+      hourData.hourlyVolumeToken = ZERO_BD
+      hourData.hourlyVolumeETH = ZERO_BD
+      hourData.hourlyVolumeUSD = ZERO_BD
+      hourData.hourlyTxns = ZERO_BI
+      hourData.save()
+    }
+  }
 }
