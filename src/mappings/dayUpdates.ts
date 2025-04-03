@@ -6,6 +6,11 @@ import { FACTORY_ADDRESS } from '../utils/constants'
 import { PairHourData, PairMinuteData, TokenHourData, TokenMinuteData } from './../types/schema'
 import { ONE_BI, ZERO_BD, ZERO_BI } from './helpers'
 
+/**
+ * Updates the daily aggregated data for the Uniswap protocol
+ * @param event The event that triggered this update
+ * @returns The updated or newly created UniswapDayData entity
+ */
 export function updateUniswapDayData(event: ethereum.Event): UniswapDayData {
   let uniswap = UniswapFactory.load(FACTORY_ADDRESS)!
   let timestamp = event.block.timestamp.toI32()
@@ -30,6 +35,11 @@ export function updateUniswapDayData(event: ethereum.Event): UniswapDayData {
   return uniswapDayData as UniswapDayData
 }
 
+/**
+ * Updates the daily aggregated data for a specific trading pair
+ * @param event The event that triggered this update
+ * @returns The updated or newly created PairDayData entity
+ */
 export function updatePairDayData(event: ethereum.Event): PairDayData {
   let timestamp = event.block.timestamp.toI32()
   let dayID = timestamp / 86400
@@ -62,6 +72,11 @@ export function updatePairDayData(event: ethereum.Event): PairDayData {
   return pairDayData as PairDayData
 }
 
+/**
+ * Updates the hourly aggregated data for a specific trading pair
+ * @param event The event that triggered this update
+ * @returns The updated or newly created PairHourData entity
+ */
 export function updatePairHourData(event: ethereum.Event): PairHourData {
   let timestamp = event.block.timestamp.toI32()
   let hourIndex = timestamp / 3600 // get unique hour within unix history
@@ -92,6 +107,11 @@ export function updatePairHourData(event: ethereum.Event): PairHourData {
   return pairHourData as PairHourData
 }
 
+/**
+ * Updates the minute-level aggregated data for a specific trading pair
+ * @param event The event that triggered this update
+ * @returns The updated or newly created PairMinuteData entity
+ */
 export function updatePairMinuteData(event: ethereum.Event): PairMinuteData {
   let timestamp = event.block.timestamp.toI32()
   let minuteIndex = timestamp / 60 // get unique minute within unix history
@@ -123,16 +143,73 @@ export function updatePairMinuteData(event: ethereum.Event): PairMinuteData {
   return pairMinuteData as PairMinuteData
 }
 
+/**
+ * Updates the daily aggregated data for a specific token, including filling gaps in historical data
+ * @param token The token entity to update data for
+ * @param event The event that triggered this update
+ * @returns The updated or newly created TokenDayData entity
+ */
 export function updateTokenDayData(token: Token, event: ethereum.Event): TokenDayData {
   let bundle = Bundle.load('1')!
   let timestamp = event.block.timestamp.toI32()
   let dayID = timestamp / 86400
   let dayStartTimestamp = dayID * 86400
+
+  // Fill missing day data
+  let prevDayID = dayID - 1
+  let lastDayData: TokenDayData | null = null
+
+  // Find last saved day data
+  for (let i = prevDayID; i > prevDayID - 7; i--) {
+    let prevID = token.id
+      .toString()
+      .concat('-')
+      .concat(BigInt.fromI32(i).toString())
+    let prevData = TokenDayData.load(prevID)
+    if (prevData !== null) {
+      lastDayData = prevData
+      break
+    }
+  }
+
+  // Fill gaps with last known values
+  for (let i = prevDayID; i < dayID; i++) {
+    let thisID = token.id
+      .toString()
+      .concat('-')
+      .concat(BigInt.fromI32(i).toString())
+    let thisData = TokenDayData.load(thisID)
+
+    if (thisData === null) {
+      thisData = new TokenDayData(thisID)
+      thisData.date = i * 86400
+      thisData.token = token.id
+
+      if (lastDayData !== null) {
+        thisData.priceUSD = lastDayData.priceUSD
+        thisData.totalLiquidityToken = lastDayData.totalLiquidityToken
+        thisData.totalLiquidityETH = lastDayData.totalLiquidityETH
+        thisData.totalLiquidityUSD = lastDayData.totalLiquidityUSD
+      } else {
+        thisData.priceUSD = token.derivedETH.times(bundle.ethPrice)
+        thisData.totalLiquidityToken = token.totalLiquidity
+        thisData.totalLiquidityETH = token.totalLiquidity.times(token.derivedETH as BigDecimal)
+        thisData.totalLiquidityUSD = thisData.totalLiquidityETH.times(bundle.ethPrice)
+      }
+
+      thisData.dailyVolumeToken = ZERO_BD
+      thisData.dailyVolumeETH = ZERO_BD
+      thisData.dailyVolumeUSD = ZERO_BD
+      thisData.dailyTxns = ZERO_BI
+      thisData.save()
+    }
+  }
+
+  // Get or create current day data
   let tokenDayID = token.id
     .toString()
     .concat('-')
     .concat(BigInt.fromI32(dayID).toString())
-
   let tokenDayData = TokenDayData.load(tokenDayID)
   if (tokenDayData === null) {
     tokenDayData = new TokenDayData(tokenDayID)
@@ -161,6 +238,12 @@ export function updateTokenDayData(token: Token, event: ethereum.Event): TokenDa
   return tokenDayData as TokenDayData
 }
 
+/**
+ * Updates the hourly aggregated data for a specific token, including filling gaps in historical data
+ * @param token The token entity to update data for
+ * @param event The event that triggered this update
+ * @returns The updated or newly created TokenHourData entity
+ */
 export function updateTokenHourData(token: Token, event: ethereum.Event): TokenHourData {
   let timestamp = event.block.timestamp.toI32()
   let hourIndex = timestamp / 3600
@@ -246,6 +329,12 @@ export function updateTokenHourData(token: Token, event: ethereum.Event): TokenH
   return tokenHourData as TokenHourData
 }
 
+/**
+ * Updates the minute-level aggregated data for a specific token, including filling gaps in historical data
+ * @param token The token entity to update data for
+ * @param event The event that triggered this update
+ * @returns The updated or newly created TokenMinuteData entity
+ */
 export function updateTokenMinuteData(token: Token, event: ethereum.Event): TokenMinuteData {
   let timestamp = event.block.timestamp.toI32()
   let minuteIndex = timestamp / 60
@@ -330,6 +419,12 @@ export function updateTokenMinuteData(token: Token, event: ethereum.Event): Toke
   return tokenMinuteData as TokenMinuteData
 }
 
+/**
+ * Fills in missing minute-level data points for a token by copying the last known values
+ * Used to ensure continuity in historical data even during periods of network downtime
+ * @param token The token entity to fill data for
+ * @param event The event that triggered this backfill
+ */
 export function fillTokenMinuteData(token: Token, event: ethereum.Event): void {
   let timestamp = event.block.timestamp.toI32()
   let minuteIndex = timestamp / 60
@@ -380,6 +475,12 @@ export function fillTokenMinuteData(token: Token, event: ethereum.Event): void {
   }
 }
 
+/**
+ * Fills in missing hourly data points for a token by copying the last known values
+ * Used to ensure continuity in historical data even during periods of network downtime
+ * @param token The token entity to fill data for
+ * @param event The event that triggered this backfill
+ */
 export function fillTokenHourData(token: Token, event: ethereum.Event): void {
   // Similar implementation for hourly data
   let timestamp = event.block.timestamp.toI32()
