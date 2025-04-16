@@ -10,10 +10,19 @@ import {
   Token,
   Transaction,
   UniswapFactory,
+  UserLiquidity,
 } from '../types/schema'
 import { Burn, Mint, Swap, Sync, Transfer } from '../types/templates/Pair/Pair'
 import { FACTORY_ADDRESS } from '../utils/constants'
-import { updatePairDayData, updatePairHourData, updateTokenDayData, updateTokenHourData, updateTokenMinuteData, updateUniswapDayData, updatePairMinuteData } from './dayUpdates'
+import {
+  updatePairDayData,
+  updatePairHourData,
+  updateTokenDayData,
+  updateTokenHourData,
+  updateTokenMinuteData,
+  updateUniswapDayData,
+  updatePairMinuteData,
+} from './dayUpdates'
 import { ADDRESS_ZERO, BI_18, convertTokenToDecimal, createUser, ONE_BI, ZERO_BD } from './helpers'
 import { findEthPerToken, getEthPriceInUSD, getTrackedLiquidityUSD, getTrackedVolumeUSD } from './pricing'
 
@@ -67,7 +76,10 @@ export function handleTransfer(event: Transfer): void {
     // this is to make sure all the mints are under the same transaction
     if (mints.length === 0 || isCompleteMint(mints[mints.length - 1])) {
       let mint = new MintEvent(
-        event.transaction.hash.toHexString().concat('-').concat(BigInt.fromI32(mints.length).toString()),
+        event.transaction.hash
+          .toHexString()
+          .concat('-')
+          .concat(BigInt.fromI32(mints.length).toString()),
       )
       mint.transaction = transaction.id
       mint.pair = pair.id
@@ -93,7 +105,10 @@ export function handleTransfer(event: Transfer): void {
   if (event.params.to.toHexString() == pair.id) {
     let burns = transaction.burns
     let burn = new BurnEvent(
-      event.transaction.hash.toHexString().concat('-').concat(BigInt.fromI32(burns.length).toString()),
+      event.transaction.hash
+        .toHexString()
+        .concat('-')
+        .concat(BigInt.fromI32(burns.length).toString()),
     )
     burn.transaction = transaction.id
     burn.pair = pair.id
@@ -129,7 +144,10 @@ export function handleTransfer(event: Transfer): void {
         burn = currentBurn as BurnEvent
       } else {
         burn = new BurnEvent(
-          event.transaction.hash.toHexString().concat('-').concat(BigInt.fromI32(burns.length).toString()),
+          event.transaction.hash
+            .toHexString()
+            .concat('-')
+            .concat(BigInt.fromI32(burns.length).toString()),
         )
         burn.transaction = transaction.id
         burn.needsComplete = false
@@ -140,7 +158,10 @@ export function handleTransfer(event: Transfer): void {
       }
     } else {
       burn = new BurnEvent(
-        event.transaction.hash.toHexString().concat('-').concat(BigInt.fromI32(burns.length).toString()),
+        event.transaction.hash
+          .toHexString()
+          .concat('-')
+          .concat(BigInt.fromI32(burns.length).toString()),
       )
       burn.transaction = transaction.id
       burn.needsComplete = false
@@ -315,6 +336,18 @@ export function handleMint(event: Mint): void {
   mint.amountUSD = amountTotalUSD as BigDecimal
   mint.save()
 
+  // Track user liquidity
+  let userLiquidityID = mint.to.toHexString() + '-' + pair.id
+  let userLiquidity = UserLiquidity.load(userLiquidityID)
+  if (userLiquidity === null) {
+    userLiquidity = new UserLiquidity(userLiquidityID)
+    userLiquidity.user = mint.to.toHexString()
+    userLiquidity.pair = pair.id
+    userLiquidity.liquidity = ZERO_BD
+  }
+  userLiquidity.liquidity = userLiquidity.liquidity.plus(mint.liquidity)
+  userLiquidity.save()
+
   // update day entities
   updatePairDayData(event)
   updatePairHourData(event)
@@ -373,13 +406,27 @@ export function handleBurn(event: Burn): void {
   uniswap.save()
 
   // update burn
-  // burn.sender = event.params.sender
   burn.amount0 = token0Amount as BigDecimal
   burn.amount1 = token1Amount as BigDecimal
-  // burn.to = event.params.to
   burn.logIndex = event.logIndex
   burn.amountUSD = amountTotalUSD as BigDecimal
   burn.save()
+
+  // Track user liquidity
+  let userLiquidityID = event.params.sender.toHexString() + '-' + pair.id
+  let userLiquidity = UserLiquidity.load(userLiquidityID)
+  if (userLiquidity === null) {
+    userLiquidity = new UserLiquidity(userLiquidityID)
+    userLiquidity.user = event.params.sender.toHexString()
+    userLiquidity.pair = pair.id
+    userLiquidity.liquidity = ZERO_BD
+  }
+  userLiquidity.liquidity = userLiquidity.liquidity.minus(burn.liquidity)
+  if (userLiquidity.liquidity.le(ZERO_BD)) {
+    store.remove('UserLiquidity', userLiquidity.id)
+  } else {
+    userLiquidity.save()
+  }
 
   // update day entities
   updatePairDayData(event)
@@ -471,7 +518,10 @@ export function handleSwap(event: Swap): void {
   }
   let swaps = transaction.swaps
   let swap = new SwapEvent(
-    event.transaction.hash.toHexString().concat('-').concat(BigInt.fromI32(swaps.length).toString()),
+    event.transaction.hash
+      .toHexString()
+      .concat('-')
+      .concat(BigInt.fromI32(swaps.length).toString()),
   )
 
   // update swap event
@@ -553,31 +603,39 @@ export function handleSwap(event: Swap): void {
 
   // Update token minute data
   token0MinuteData.minuteVolumeToken = token0MinuteData.minuteVolumeToken.plus(amount0Total)
-  token0MinuteData.minuteVolumeETH = token0MinuteData.minuteVolumeETH.plus(amount0Total.times(token0.derivedETH as BigDecimal))
+  token0MinuteData.minuteVolumeETH = token0MinuteData.minuteVolumeETH.plus(
+    amount0Total.times(token0.derivedETH as BigDecimal),
+  )
   token0MinuteData.minuteVolumeUSD = token0MinuteData.minuteVolumeUSD.plus(
-    amount0Total.times(token0.derivedETH as BigDecimal).times(bundle.ethPrice)
+    amount0Total.times(token0.derivedETH as BigDecimal).times(bundle.ethPrice),
   )
   token0MinuteData.save()
 
   token1MinuteData.minuteVolumeToken = token1MinuteData.minuteVolumeToken.plus(amount1Total)
-  token1MinuteData.minuteVolumeETH = token1MinuteData.minuteVolumeETH.plus(amount1Total.times(token1.derivedETH as BigDecimal))
+  token1MinuteData.minuteVolumeETH = token1MinuteData.minuteVolumeETH.plus(
+    amount1Total.times(token1.derivedETH as BigDecimal),
+  )
   token1MinuteData.minuteVolumeUSD = token1MinuteData.minuteVolumeUSD.plus(
-    amount1Total.times(token1.derivedETH as BigDecimal).times(bundle.ethPrice)
+    amount1Total.times(token1.derivedETH as BigDecimal).times(bundle.ethPrice),
   )
   token1MinuteData.save()
 
   // Update token hour data
   token0HourData.hourlyVolumeToken = token0HourData.hourlyVolumeToken.plus(amount0Total)
-  token0HourData.hourlyVolumeETH = token0HourData.hourlyVolumeETH.plus(amount0Total.times(token0.derivedETH as BigDecimal))
+  token0HourData.hourlyVolumeETH = token0HourData.hourlyVolumeETH.plus(
+    amount0Total.times(token0.derivedETH as BigDecimal),
+  )
   token0HourData.hourlyVolumeUSD = token0HourData.hourlyVolumeUSD.plus(
-    amount0Total.times(token0.derivedETH as BigDecimal).times(bundle.ethPrice)
+    amount0Total.times(token0.derivedETH as BigDecimal).times(bundle.ethPrice),
   )
   token0HourData.save()
 
   token1HourData.hourlyVolumeToken = token1HourData.hourlyVolumeToken.plus(amount1Total)
-  token1HourData.hourlyVolumeETH = token1HourData.hourlyVolumeETH.plus(amount1Total.times(token1.derivedETH as BigDecimal))
+  token1HourData.hourlyVolumeETH = token1HourData.hourlyVolumeETH.plus(
+    amount1Total.times(token1.derivedETH as BigDecimal),
+  )
   token1HourData.hourlyVolumeUSD = token1HourData.hourlyVolumeUSD.plus(
-    amount1Total.times(token1.derivedETH as BigDecimal).times(bundle.ethPrice)
+    amount1Total.times(token1.derivedETH as BigDecimal).times(bundle.ethPrice),
   )
   token1HourData.save()
 }

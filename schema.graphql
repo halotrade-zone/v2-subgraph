@@ -101,6 +101,13 @@ type User @entity {
   usdSwapped: BigDecimal!
 }
 
+type UserLiquidity @entity {
+  id: ID!
+  user: User!
+  pair: Pair!
+  liquidity: BigDecimal!
+}
+
 type Transaction @entity {
   id: ID! # txn hash
   blockNumber: BigInt!
